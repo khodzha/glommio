@@ -82,6 +82,10 @@ mod hyper_compat {
         R: std::error::Error + 'static + Send + Sync,
         A: Into<SocketAddr>,
     {
+        println!("My pid is {:?}", std::thread::current().id());
+
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
         let listener = TcpListener::bind(addr.into())?;
         let conn_control = Rc::new(Semaphore::new(max_connections as _));
         loop {
@@ -125,18 +129,17 @@ fn main() {
     // see it in action
 
     println!("Starting server on port 8000");
+    println!("My pid is {}", std::process::id());
+    println!("My pid is {:?}", std::thread::current().id());
 
-    LocalExecutorPoolBuilder::new(PoolPlacement::MaxSpread(
-        num_cpus::get(),
-        CpuSet::online().ok(),
-    ))
-    .on_all_shards(|| async move {
-        let id = glommio::executor().id();
-        println!("Starting executor {}", id);
-        hyper_compat::serve_http(([0, 0, 0, 0], 8000), hyper_demo, 1024)
-            .await
-            .unwrap();
-    })
-    .unwrap()
-    .join_all();
+    LocalExecutorPoolBuilder::new(PoolPlacement::Unbound(1))
+        .on_all_shards(|| async move {
+            let id = glommio::executor().id();
+            println!("Starting executor {}", id);
+            hyper_compat::serve_http(([0, 0, 0, 0], 8000), hyper_demo, 1024)
+                .await
+                .unwrap();
+        })
+        .unwrap()
+        .join_all();
 }
